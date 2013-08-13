@@ -25,7 +25,7 @@ type Doc struct {
 // recompile will cause sphinx-build to re-run, but does not remove
 // the doctrees diretory, which sphinx-build uses as a cache.
 func GetDocs(sphinxCmd string, docDir string, includeSource bool, recompile bool) ([]Doc, []error) {
-	buildDir := filepath.Join(docDir, "_build", "oedipus_html")
+	buildDir := GetHTMLBuildDir(docDir)
 	cacheDir := filepath.Join(docDir, "_build", "doctrees")
 	if _, err := os.Lstat(buildDir); recompile || err != nil {
 		err := buildDocs(sphinxCmd, docDir, buildDir, cacheDir)
@@ -35,6 +35,10 @@ func GetDocs(sphinxCmd string, docDir string, includeSource bool, recompile bool
 	}
 
 	return extractDocs(buildDir, includeSource)
+}
+
+func GetHTMLBuildDir(docDir string) string {
+	return filepath.Join(docDir, "_build", "oedipus_html")
 }
 
 func buildDocs(sphinxCmd string, sourceDir, buildDir, cacheDir string) error {
