@@ -3,14 +3,14 @@ package oedipus
 import (
 	"fmt"
 	"io/ioutil"
-	// "log"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 )
 
-var sphinxCmd = "sphinx-build" // This should be set to the path to the sphinx command
+var sphinxCmd = "sphinx-build" // TODO: This should be set to the path to the sphinx command
 
 type Doc struct {
 	Symbol     string
@@ -21,15 +21,17 @@ type Doc struct {
 	Body       string
 }
 
-func GetDocs(docDir string) ([]Doc, []error) {
+func GetDocs(docDir string, includeSource bool) ([]Doc, []error) {
 	buildDir := filepath.Join(docDir, "_build", "oedipus_html")
 	cacheDir := filepath.Join(docDir, "_build", "doctrees")
-	err := buildDocs(docDir, buildDir, cacheDir)
-	if err != nil {
-		return nil, []error{err}
+	if _, err := os.Lstat(buildDir); err != nil {
+		err := buildDocs(docDir, buildDir, cacheDir)
+		if err != nil {
+			return nil, []error{err}
+		}
 	}
 
-	return extractDocs(buildDir)
+	return extractDocs(buildDir, includeSource)
 }
 
 func buildDocs(sourceDir, buildDir, cacheDir string) error {
@@ -41,14 +43,20 @@ func buildDocs(sourceDir, buildDir, cacheDir string) error {
 	return nil
 }
 
-func extractDocs(buildDir string) (docs []Doc, errs []error) {
+func extractDocs(buildDir string, includeSource bool) (docs []Doc, errs []error) {
 	filepath.Walk(buildDir, func(path string, info os.FileInfo, err error) error {
 		ext := filepath.Ext(path)
-		if !info.IsDir() && (ext == ".txt" || ext == ".rst") {
+		if !info.IsDir() && ext == ".html" {
 			if b, err := ioutil.ReadFile(path); err == nil {
+				// log.Printf("Processing %s", path)
+
 				body := string(b)
 				parser := new(docParseState)
-				theseDocs, theseErrs := parser.extractDocsFromHtml(body, "", true)
+				relpath, err := filepath.Rel(buildDir, path)
+				if err != nil {
+					log.Panicf("Trying to visit file outside of buildDir: %s", path)
+				}
+				theseDocs, theseErrs := parser.extractDocsFromHtml(body, relpath, includeSource)
 
 				docs = append(docs, theseDocs...)
 				errs = append(errs, theseErrs...)
@@ -88,9 +96,16 @@ func (d *docParseState) extractDocsFromHtml(html string, sourceFile string, incl
 			(len(d.nextId) == 0 || d.nextClassStart[0] < d.nextId[0]) {
 
 			if len(d.nextClassStart) == 4 {
-				className := html[d.nextClassStart[2]:d.nextClassStart[3]]
-				d.Stack = append(d.Stack, Doc{Class: className, SourceFile: sourceFile, Start: d.nextClassStart[0]}) // TODO:SourceFile
-				// log.Printf("<dl>: %s", className)
+				if d.nextClassStart[3] >= 0 {
+					// log.Printf("%v", d.nextClassStart)
+					// log.Printf("%s", html[d.nextClassStart[0]:d.nextClassStart[1]])
+
+					className := html[d.nextClassStart[2]:d.nextClassStart[3]]
+					d.Stack = append(d.Stack, Doc{Class: className, SourceFile: sourceFile, Start: d.nextClassStart[0]})
+					// log.Printf("<dl>: %s", className)
+				} else {
+					d.Stack = append(d.Stack, Doc{SourceFile: sourceFile, Start: d.nextClassStart[0]})
+				}
 			}
 
 			d.index = d.nextClassStart[1]
