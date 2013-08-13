@@ -26,6 +26,10 @@ func TestExtractDocsFromHtml(t *testing.T) {
 <dt>
 </dl>
 
+<dl>
+<dt>
+</dl>
+
 </dl>
 </body>
 `,
@@ -62,6 +66,10 @@ func TestExtractDocsFromHtml(t *testing.T) {
 </dl>
 
 <dl class="data">
+<dt>
+</dl>
+
+<dl>
 <dt>
 </dl>
 
