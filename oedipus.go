@@ -10,8 +10,6 @@ import (
 	"regexp"
 )
 
-var sphinxCmd = "sphinx-build" // TODO: This should be set to the path to the sphinx command
-
 type Doc struct {
 	Symbol     string
 	Class      string
@@ -21,11 +19,16 @@ type Doc struct {
 	Body       string
 }
 
-func GetDocs(docDir string, includeSource bool) ([]Doc, []error) {
+// Extract the docs from the docs directory. If includeSource is
+// false, the returned docs won't actually contain the doc bodies,
+// merely the name of the file and start/end of the doc. Note that
+// recompile will cause sphinx-build to re-run, but does not remove
+// the doctrees diretory, which sphinx-build uses as a cache.
+func GetDocs(sphinxCmd string, docDir string, includeSource bool, recompile bool) ([]Doc, []error) {
 	buildDir := filepath.Join(docDir, "_build", "oedipus_html")
 	cacheDir := filepath.Join(docDir, "_build", "doctrees")
-	if _, err := os.Lstat(buildDir); err != nil {
-		err := buildDocs(docDir, buildDir, cacheDir)
+	if _, err := os.Lstat(buildDir); recompile || err != nil {
+		err := buildDocs(sphinxCmd, docDir, buildDir, cacheDir)
 		if err != nil {
 			return nil, []error{err}
 		}
@@ -34,7 +37,7 @@ func GetDocs(docDir string, includeSource bool) ([]Doc, []error) {
 	return extractDocs(buildDir, includeSource)
 }
 
-func buildDocs(sourceDir, buildDir, cacheDir string) error {
+func buildDocs(sphinxCmd string, sourceDir, buildDir, cacheDir string) error {
 	cmd := exec.Command(sphinxCmd, "-b", "html", "-d", cacheDir, sourceDir, buildDir)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
